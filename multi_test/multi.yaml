@@ -1,0 +1,57 @@
+# multi_object_search.yaml
+defaults:
+  - /habitat: habitat_config_base
+  - /habitat/task: objectnav
+  - /habitat/task/lab_sensors:
+      - base_explorer
+      - compass_sensor
+      - gps_sensor
+      - heading_sensor
+      - frontier_sensor
+  - /habitat/simulator/agents@habitat.simulator.agents.main_agent: rgbd_agent
+  - /habitat/dataset/objectnav: hm3d
+  - _self_
+
+  
+habitat:
+  task:
+    lab_sensors:
+      base_explorer:
+        turn_angle: 30
+  environment:
+    max_episode_steps: 500
+    iterator_options:
+      max_scene_repeat_steps: 50000
+  dataset:
+    type: "multi_obj_dataset"
+    split: val
+    data_path: data/multi_data/{split}/{split}.json.gz
+  simulator:
+    turn_angle: 30
+    tilt_angle: 30
+    action_space_config: "v1"
+    agents:
+      main_agent:
+        height: 0.88
+        radius: 0.01
+        sim_sensors:
+          rgb_sensor:
+            width: 640
+            height: 480
+            hfov: 79
+            position: [0, 0.88, 0]
+          depth_sensor:
+            width: 640
+            height: 480
+            hfov: 79
+            min_depth: 0.5
+            max_depth: 5.0
+            position: [0, 0.88, 0]
+    habitat_sim_v0:
+      gpu_device_id: 0
+      allow_sliding: False
+
+  
+
+
+  
