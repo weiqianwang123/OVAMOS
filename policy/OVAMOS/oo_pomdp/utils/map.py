@@ -64,7 +64,6 @@ class Map:
             self._rrt_planner = RRTPlanner(self.obstacle_map)
             self._rrt_planner.build_rrt()
             px,py = self._rrt_planner.find_nearest_navigable_node((px,py))
-            # px, py = self.find_nearest_navigable(px, py)
         x,y = self._px_to_xy(np.array([[px, py]]))[0]
 
         self.navigate_mode = True
@@ -72,21 +71,7 @@ class Map:
     def reset_navigate(self):
         self.navigate_mode = False
         self.navigate_goal = None
-    def get_random_points(self):
-        navigable_indices = np.argwhere(self.obstacle_map == 1)
-    
-        if len(navigable_indices) == 0:
-            print("No navigable points found!")
-            return None
 
-        # 随机选择一个可通行点
-        rand_idx = np.random.choice(len(navigable_indices))
-        row, col = navigable_indices[rand_idx]
-
-        # 转换到全局坐标系
-        global_xy = self._px_to_xy(np.array([[row, col]]))[0]  # (x, y)
-        
-        return global_xy
     def get_candidate_points(self, robot_pose=None):
         """
         获取候选点：
@@ -336,7 +321,7 @@ class Map:
         self.frontiers = new_frontiers
         # self._rrt_planner = RRTPlanner(self.obstacle_map)
         # self._rrt_planner.build_rrt()
-        self._astar_planner = AStarPlanner(self.obstacle_map)
+        # self._astar_planner = AStarPlanner(self.obstacle_map)
         if select_best and len(self.frontiers) > 0:
             # 将 frontiers 转换为 numpy 数组（假设每个 frontier 为 [x, y]）
             print("have frontier!")
@@ -353,39 +338,48 @@ class Map:
             self.frontiers = [(x,y)]
         print("map updated in pomdp")
 
-    def find_nearest_navigable(self,px, py):
-        """
-        找到距离 (px, py) 最近的可通行点。
-        使用 BFS 搜索最近的 free space（非障碍物区域）。
-        """
-        rows, cols = self.obstacle_map.shape
-        queue = deque([(px, py, 0)])  # (x, y, 距离)
-        visited = set([(px, py)])
+    def get_best_point_in_value(self, num_samples=10):
+        threshold = 0.05
+        indices = np.argwhere(self.value_map > threshold)
+        if len(indices) == 0:
+            print("Warning: No valid high-value areas found in value_map.")
+            return {}
         
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # 上下左右
+        # 将像素坐标转换为 (x, y) 坐标
+        xy_candidates = self._px_to_xy(indices)
+        xy_candidates = np.array(xy_candidates)
         
-        while queue:
-            x, y, dist = queue.popleft()
-            if self.obstacle_map[x, y] == 1:  # 找到可通行点
-                return (x, y)
-            
-            for dx, dy in directions:
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < rows and 0 <= ny < cols and (nx, ny) not in visited:
-                    queue.append((nx, ny, dist + 1))
-                    visited.add((nx, ny))
+        # DBSCAN 聚类
+        clustering = DBSCAN(eps=0.1, min_samples=1).fit(xy_candidates)
+        labels = clustering.labels_
         
-        return None # 理论上不应该发生
+        prior = {}
+        unique_labels = set(labels)
+        best_point_in_all = None
+        best_value_in_all = -np.inf
+        # 对每个聚类，选取 value_map 值最高的点
+        for label in unique_labels:
+            cluster_indices = np.where(labels == label)[0]
+            best_point = None
+            best_value = -np.inf
+            for idx in cluster_indices:
+                row, col = indices[idx]
+                point_value = float(self.value_map[row, col])
+                if point_value > best_value:
+                    best_value = point_value
+                    best_point = self._px_to_xy(np.array([[row, col]]))[0]
+                    best_px, best_py = row, col
+            if best_value > best_value_in_all:
+                best_point_in_all =  best_point
+        px,py = self._xy_to_px(np.array([[best_point_in_all[0],best_point_in_all[1]]]))[0]
+        if self.obstacle_map[px, py] == 0 :
+            self._rrt_planner = RRTPlanner(self.obstacle_map)
+            self._rrt_planner.build_rrt()
+            px,py = self._rrt_planner.find_nearest_navigable_node((px,py))
+            x,y = self._px_to_xy(np.array([[px, py]]))[0]
+            best_point_in_all = (x,y)
+        return best_point_in_all
     def get_prior_with_value_map(self, num_samples=10):
-        """
-        根据 value_map 生成一个归一化的概率密度直方图，并从中采样 1000 个点作为 prior。
-
-        Args:
-            num_samples (int): 需要采样的点数，默认 1000。
-
-        Returns:
-            dict: prior 字典，key 是 (x, y) 位置，value 是概率 (1/num_samples)。
-        """
         threshold = 0.05
         indices = np.argwhere(self.value_map > threshold)
         if len(indices) == 0:
@@ -417,18 +411,12 @@ class Map:
                     best_point = self._px_to_xy(np.array([[row, col]]))[0]
                     best_px, best_py = row, col
             if best_point is not None:
-                if self.obstacle_map[best_px, best_py] == 0 :
-                    new_px, new_py = self.find_nearest_navigable(best_px, best_py)
-                    best_point = self._px_to_xy(np.array([[new_px, new_py]]))[0]  # 转换回 (x, y)
-
                 prior[tuple(best_point)] = best_value
-            if len(prior) >= num_samples:
-                break
-        if len(prior)==1:
-            only_key,only_value = list(prior.items())[0]
-            prior[only_key] = only_value
-            new_key = (only_key[0]+0.1,only_key[1]+0.1)
-            prior[new_key] = only_value/2
+        # if len(prior)==1:
+        #     only_key,only_value = list(prior.items())[0]
+        #     prior[only_key] = only_value
+        #     new_key = (only_key[0]+0.1,only_key[1]+0.1)
+        #     prior[new_key] = only_value/2
         self.prior = prior
         print("PRIOR BY VALUE MAP:",prior)
         return prior

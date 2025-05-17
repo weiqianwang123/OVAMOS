@@ -20,73 +20,74 @@ from visualization_msgs.msg import Marker
 
 class GoalPublisherNode:
     def __init__(self):
-        rospy.init_node('goal_publisher_node', anonymous=True)
+        try:
+            rospy.init_node('goal_publisher_node', anonymous=True)
 
-        # Subscribers
-        self.odom_sub = rospy.Subscriber('/odom', Odometry, self.odom_callback)
-        # self.depth_sub = rospy.Subscriber('/zed/zed_node/depth/depth_registered', Image, self.depth_callback)
-        # self.rgb_sub = rospy.Subscriber('/zed/zed_node/rgb_raw/image_raw_color', Image, self.rgb_callback)
-        self.depth_sub = rospy.Subscriber('/rs_camera/aligned_depth_to_color/image_raw', Image, self.depth_callback)
-        self.rgb_sub = rospy.Subscriber('/rs_camera/color/image_raw', Image, self.rgb_callback)
-        self.state_sub = rospy.Subscriber('/restart_signal',String, self.state_callback, queue_size=10)
-        # Subscribe to /map topic
-        self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
-        # Publisher
-        self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.init_pub = rospy.Publisher('/init_signal', String, queue_size=10)
-        self.marker_pub = rospy.Publisher('visualization_marker', Marker, queue_size=10)
+            # Subscribers
+            self.odom_sub = rospy.Subscriber('/odom', Odometry, self.odom_callback)
+            # self.depth_sub = rospy.Subscriber('/zed/zed_node/depth/depth_registered', Image, self.depth_callback)
+            # self.rgb_sub = rospy.Subscriber('/zed/zed_node/rgb_raw/image_raw_color', Image, self.rgb_callback)
+            self.depth_sub = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, self.depth_callback)
+            self.rgb_sub = rospy.Subscriber('/camera/color/image_raw', Image, self.rgb_callback)
+            self.state_sub = rospy.Subscriber('/restart_signal',String, self.state_callback, queue_size=10)
+            # Subscribe to /map topic
+            self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
+            # Publisher
+            self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+            self.init_pub = rospy.Publisher('/init_signal', String, queue_size=10)
+            self.marker_pub = rospy.Publisher('visualization_marker', Marker, queue_size=10)
 
-        self.tf_listener = tf.TransformListener()
-        hardcoded_params = {
-            "camera_height": 0.25,  # 摄像头高度
-            "min_depth": 0.5,  # 深度传感器的最小深度
-            "max_depth":  5.0,  # 深度传感器的最大深度
-            "camera_fov": 58,  # 摄像头视场 (FOV) 角度
-            "image_width": 640,  # 图像宽度（像素）
-            "dataset_type": "reality",  # 数据集类型
-        }
-        self.step = 0
-        self.goal_classes_string ="sink|umbrella"
+            self.tf_listener = tf.TransformListener()
+            hardcoded_params = {
+                "camera_height": 0.25,  # 摄像头高度
+                "min_depth": 0.5,  # 深度传感器的最小深度
+                "max_depth":  5.0,  # 深度传感器的最大深度
+                "camera_fov": 58,  # 摄像头视场 (FOV) 角度
+                "image_width": 640,  # 图像宽度（像素）
+                "dataset_type": "reality",  # 数据集类型
+            }
+            self.step = 0
+            self.goal_classes_string ="toothbrush|sink"
 
+            
 
-
-        # Utility
-        self.old_marker_ids = []
-        self.bridge = CvBridge()
-        self.current_odom = None
-        self.latest_depth = None
-        self.latest_rgb = None
-        self.state = "init"
-        self.policy = POMDP_REALITY_Policy(
-            depth_image_shape = (720, 1280),
-            object_map_erosion_size  = 5,
-            text_prompt=self.goal_classes_string,
-            asking_prompt="Seems like there is a target_object ahead.",
-            camera_height=hardcoded_params["camera_height"],
-            min_depth=hardcoded_params["min_depth"],
-            max_depth=hardcoded_params["max_depth"],
-            camera_fov=hardcoded_params["camera_fov"],
-            image_width=hardcoded_params["image_width"],
-            dataset_type=hardcoded_params["dataset_type"],
-            visualize = True,
-            compute_frontiers= True,
-            min_obstacle_height = 1,
-            max_obstacle_height =2,
-            agent_radius = 0.18,
-            obstacle_map_area_threshold  = 1.5 , # in square meters
-            hole_area_thresh  = 100000,
-            use_vqa = False,
-            vqa_prompt  = "Is this ",
-            coco_threshold = 0.8,
-            non_coco_threshold = 0.4,
-            use_max_confidence = False,
-            sync_explored_areas = False,
+            # Utility
+            self.old_marker_ids = []
+            self.bridge = CvBridge()
+            self.current_odom = None
+            self.latest_depth = None
+            self.latest_rgb = None
+            self.state = "init"
+            self.policy = POMDP_REALITY_Policy(
+                depth_image_shape = (720, 1280),
+                object_map_erosion_size  = 5,
+                text_prompt=self.goal_classes_string,
+                asking_prompt="Seems like there is a target_object ahead.",
+                camera_height=hardcoded_params["camera_height"],
+                min_depth=hardcoded_params["min_depth"],
+                max_depth=hardcoded_params["max_depth"],
+                camera_fov=hardcoded_params["camera_fov"],
+                image_width=hardcoded_params["image_width"],
+                dataset_type=hardcoded_params["dataset_type"],
+                visualize = True,
+                compute_frontiers= True,
+                min_obstacle_height = 1,
+                max_obstacle_height =2,
+                agent_radius = 0.18,
+                obstacle_map_area_threshold  = 1.5 , # in square meters
+                hole_area_thresh  = 100000,
+                use_vqa = False,
+                vqa_prompt  = "Is this ",
+                coco_threshold = 0.3,
+                non_coco_threshold = 0.4,
+                use_max_confidence = False,
+                sync_explored_areas = False,
+            
+            )
         
-        )
-        # self.map = None
-        # self.map_height = None
-        # self.map_width = None
-        print("init done ,search for",self.goal_classes_string)
+            print("init done ,search for",self.goal_classes_string)
+        except Exception as e:
+            print("[ERROR] Init failed:", e)
     def delete_old_markers(self):
         for marker_id in self.old_marker_ids:
             marker = Marker()
@@ -287,10 +288,25 @@ class GoalPublisherNode:
             if goal_class in class_list:
                 class_list.remove(goal_class)
             
+            
+            
             # Join the remaining classes back into a string
             updated_goal_classes = "|".join(class_list)
+            
+            if not updated_goal_classes:
+                rospy.loginfo("🎉  All targets found – stopping the robot")
+                # 1) tell move_base to cancel any active goal
+                self.cancel_pub.publish(GoalID())
+
+                # 3) clean-up visual markers, log, and shut down node
+                self.delete_old_markers()
+                rospy.signal_shutdown("Task complete")
+                return           
+            self.goal_classes_string = updated_goal_classes
             self.policy.reset_targets(updated_goal_classes)
             time.sleep(3)
+           
+
 
         # Publish the goal
         goal_msg = PoseStamped()
@@ -321,20 +337,20 @@ class GoalPublisherNode:
         self.old_marker_ids.append(0)
 
         rospy.loginfo(f"Published goal at: ({goal[0]}, {goal[1]})")
-        obstacle_map = self.policy._policy_info.get("obstacle_map", np.zeros((100, 100)))  # Default to blank
-        value_map = self.policy._policy_info.get("value_map", np.zeros((100, 100)))  # Default to blank
-        plt.figure(figsize=(5, 5))
-        plt.imshow(obstacle_map, cmap="gray", origin="upper")
-        plt.colorbar(label="Obstacle Intensity")
-        plt.title("Obstacle Map")
-        plt.savefig(f"/home/yfx/vlfm/vlfm/reality_experiment/obstacle_map_{self.step}.png")
+        # obstacle_map = self.policy._policy_info.get("obstacle_map", np.zeros((100, 100)))  # Default to blank
+        # value_map = self.policy._policy_info.get("value_map", np.zeros((100, 100)))  # Default to blank
+        # plt.figure(figsize=(5, 5))
+        # plt.imshow(obstacle_map, cmap="gray", origin="upper")
+        # plt.colorbar(label="Obstacle Intensity")
+        # plt.title("Obstacle Map")
+        # plt.savefig(f"/home/qianwei/vlfm/vlfm/reality_experiment/obstacle_map/obstacle_map_{self.step}.png")
         
 
-        plt.figure(figsize=(5, 5))
-        plt.imshow(value_map, cmap="viridis", origin="upper")
-        plt.colorbar(label="Value Intensity")
-        plt.title("Value Map")
-        plt.savefig(f"/home/yfx/vlfm/vlfm/reality_experiment/value_map_{self.step}.png")
+        # plt.figure(figsize=(5, 5))
+        # plt.imshow(value_map, cmap="viridis", origin="upper")
+        # plt.colorbar(label="Value Intensity")
+        # plt.title("Value Map")
+        # plt.savefig(f"/home/qianwei/vlfm/vlfm/reality_experiment/value_map/value_map_{self.step}.png")
 
     def get_yaw_from_odometry(self, odom_msg):
         """Extracts yaw (rotation around Z) from odometry quaternion."""

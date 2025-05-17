@@ -9,6 +9,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
     def __init__(self,map,robot_id):
         self.robot_id = robot_id
         self._map = map
+        self.used_action = set()
 
     def update_map(self,new_map):
         self._map = new_map
@@ -24,17 +25,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         raise NotImplementedError
 
     def get_all_actions(self, state=None, history=None):
-        # if state is None:
-        #     return ALL_MOTION_ACTIONS 
-        # else:
-        #     if self._map is not None:
-        #         valid_motions = self._map.valid_motions(
-        #             state.pose(self.robot_id), ALL_MOTION_ACTIONS
-        #         )
-        #         return list(valid_motions)
-        #     else: 
-        #         return ALL_MOTION_ACTIONS
-      
+
 
         # 获取所有候选点
         candidate_points = self._map.get_candidate_points(state.pose(self.robot_id))
@@ -46,13 +37,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
 
     def rollout(self, state, history=None):
-    #     actions = self.get_all_actions(state=state, history=history)
     
-    # # 如果 'moveforward' 在 actions 中，增加它的比重
-    #     weights = [2 if isinstance(action, MoveForwardAction) else 1 for action in actions]
-        
-    #     return random.choices(actions, weights=weights, k=1)[0]
-        
         # 获取所有可能的 MoveTo actions（已经是排序好的）
         actions = self.get_all_actions(state=state, history=history)
         

@@ -93,7 +93,7 @@ class RRTPlanner:
                 self.nodes.append(new_node)
                 self.graph.add_node(new_node)
                 self.graph.add_edge(nearest, new_node, weight=np.linalg.norm(np.array(nearest) - np.array(new_node)))
-        self.visualize_rrt_tree()
+        # self.visualize_rrt_tree()
         print(f"RRT 生成完成，节点数: {len(self.nodes)}")
 
     def find_path(self, start, goal, save_path="rrt_path.png"):
@@ -121,7 +121,7 @@ class RRTPlanner:
             return None
         
         # 可视化并保存路径
-        self.visualize_path(start, goal, path, save_path)
+        # self.visualize_path(start, goal, path, save_path)
         return path
 
     def visualize_path(self, start, goal, path, save_path):
@@ -161,7 +161,7 @@ class RRTPlanner:
 
 
 
-    def visualize_rrt_tree(self, save_path="/home/yfx/vlfm/output_frames_POMDP/rrt_tree.png"):
+    def visualize_rrt_tree(self, save_path="/home/qianwei/vlfm/vlfm/reality_experiment/others/rrt_tree.png"):
         """可视化当前 RRT 树并保存到本地"""
         fig, ax = plt.subplots(figsize=(8, 8))
 

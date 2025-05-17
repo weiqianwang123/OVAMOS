@@ -216,21 +216,19 @@ class MosOOPOMDP():
         # if action_class not in ACTION_TO_INT:
         #     raise ValueError(f"Unsupported action type: {action_class}")
         # action_num = ACTION_TO_INT[action_class]
-        best_frontier = self.get_best_frontier()
+        best_point = self.get_best_point()
         
         # return action.motion()
-        return (best_frontier[0],best_frontier[1],0)
-    def get_best_frontier(self):
+        return (best_point[0],best_point[1],0)
+    def get_best_point(self):
+        # best_point = self.map.get_best_point_in_value()
+        # bese_frontier = self.map.frontiers[0]
         if self.map.frontiers:
             return self.map.frontiers[0]
         else:
-            return (0,0,0)
-    def get_random_point(self):
-        random_point = self.map.get_random_points()
-        if random_point is not None:
-            return random_point
-        else:
-            return (0,0)
+            return self.map.get_best_point_in_value()
+   
+   
     def update(self,real_action_num,real_observation_pose,real_robo_pose,new_value_map,new_obstacle_map,new_frontiers):
         if real_action_num not in INT_TO_ACTION:
             raise ValueError(f"Unsupported action code: {real_action_num}")
@@ -264,8 +262,8 @@ class MosOOPOMDP():
        
 
         print("robo pose",real_robo_pose)
-        self._belief_update(real_robo_pose)
-        print("belief update done")
+        # self._belief_update(real_robo_pose)
+        # print("belief update done")
         robot_px = self.map._xyz_to_px(np.array([[real_robo_pose[0], real_robo_pose[1],real_robo_pose[2]]]))[0]
         r_px, c_px,theta= robot_px
        
@@ -284,7 +282,7 @@ class MosOOPOMDP():
 
         # print(f"Appended robot pose to {csv_filename}")
 
-        self.map.save_maps(belief=self.agent.cur_belief,objid=self._objid,robot_id=self.robot_id,robot_pose=real_robo_pose,detected_pose=real_observation_pose,save_path="/home/yfx/vlfm/output_frames_POMDP/map.png")
+        # self.map.save_maps(belief=self.agent.cur_belief,objid=self._objid,robot_id=self.robot_id,robot_pose=real_robo_pose,detected_pose=real_observation_pose,save_path="/home/yfx/vlfm/output_frames_POMDP/map.png")
         print("goal for map",self.map.navigate_goal)
        
 

@@ -124,8 +124,8 @@ class ValueMap(BaseMap):
         min_depth: float,
         max_depth: float,
         fov: float,
-        if_decay=False,
-        decay_thresh = 10,
+        if_decay=True,
+        decay_thresh = 6,
         deacy_speed = 2,
 
     ) -> None:

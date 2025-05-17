@@ -97,7 +97,7 @@ class POMDP_REALITY_Policy():
         hole_area_thresh: int = 100000,
         use_vqa: bool = False,
         vqa_prompt: str = "Is this ",
-        coco_threshold: float = 0.8,
+        coco_threshold: float = 0.3,
         non_coco_threshold: float = 0.4,
         
         use_max_confidence: bool = False,
@@ -106,7 +106,6 @@ class POMDP_REALITY_Policy():
         pointnav_policy_path = "data/pointnav_weights.pth"
 
     ) -> None:
-        self._pointnav_policy = WrappedPointNavResNetPolicy(pointnav_policy_path)
         # self._object_detector = GroundingDINOClient(port=int(os.environ.get("GROUNDING_DINO_PORT", "12181")))
         self._coco_object_detector = YOLOv7Client(port=int(os.environ.get("YOLOV7_PORT", "12184")))
         self._mobile_sam = MobileSAMClient(port=int(os.environ.get("SAM_PORT", "12183")))
@@ -163,45 +162,11 @@ class POMDP_REALITY_Policy():
         self._pomdp_planner = None
         self._prior_action = -1
         self.goal_class = None
-    def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
-        """
-        Calculates rho and theta from the robot's current position to the goal using the
-        gps and heading sensors within the observations and the given goal, then uses
-        it to determine the next action to take using the pre-trained pointnav policy.
-
-        Args:
-            goal (np.ndarray): The goal to navigate to as (x, y), where x and y are in
-                meters.
-            stop (bool): Whether to stop if we are close enough to the goal.
-
-        """
-        masks = torch.tensor([self._num_steps != 0], dtype=torch.bool, device="cuda")
-        if not np.array_equal(goal, self._last_goal):
-            if np.linalg.norm(goal - self._last_goal) > 0.1:
-                self._pointnav_policy.reset()
-                masks = torch.zeros_like(masks)
-            self._last_goal = goal
-        robot_xy = self._observations_cache["robot_xy"]
-        heading = self._observations_cache["robot_heading"]
-        rho, theta = rho_theta(robot_xy, heading, goal)
-        rho_theta_tensor = torch.tensor([[rho, theta]], device="cuda", dtype=torch.float32)
-        obs_pointnav = {
-            "depth": image_resize(
-                self._observations_cache["nav_depth"],
-                (self._depth_image_shape[0], self._depth_image_shape[1]),
-                channels_last=True,
-                interpolation_mode="area",
-            ),
-            "pointgoal_with_gps_compass": rho_theta_tensor,
-        }
-        self._policy_info["rho_theta"] = np.array([rho, theta])
-       
-        action = self._pointnav_policy.act(obs_pointnav, masks, deterministic=True)
-        return action
+        print("init done for policy")
 
     def reset(self):
         self._target_object = ""
-        self._pointnav_policy.reset()
+
         self._object_map.reset()
         self._last_goal = np.zeros(2)
         self._num_steps = 0
@@ -261,9 +226,7 @@ class POMDP_REALITY_Policy():
             goal_pose = self._pomdp_act()
             action = 1
             
-            # action_xy = action[:2]  # ✅ 取前两个元素 (x, y)
-
-            # action = self._pointnav(np.array(action_xy),stop=False).item()
+            
         else:
             mode = "navigate"
             if not self._done_initialize_pomdp:
@@ -277,9 +240,7 @@ class POMDP_REALITY_Policy():
             else:
                 action = 1
                 goal_pose = self._pomdp_act()
-                
-                # action_xy = action[:2]  # ✅ 取前两个元素 (x, y)
-                # action = self._pointnav(np.array(action_xy),stop=False).item()
+              
        
         
         
@@ -413,37 +374,6 @@ class POMDP_REALITY_Policy():
             self._observations_cache["object_map_rgbd"][0] = tuple(obs)
         for idx in range(len(detections.logits)):
             bbox_denorm = detections.boxes[idx] * np.array([width, height, width, height])
-            # def bbox_to_mask(rgb, bbox):
-            #     """
-            #     Create a binary mask from bounding box coordinates.
-
-            #     Args:
-            #         rgb  : Image array of shape (H, W, 3).
-            #         bbox : List or tuple containing [x_min, y_min, x_max, y_max] 
-            #             bounding box coordinates.
-
-            #     Returns:
-            #         Binary mask (H, W) with 1s inside the bounding box and 0s outside.
-            #     """
-            #     # Convert bbox coordinates to int
-            #     x_min, y_min, x_max, y_max = map(int, bbox)
-
-            #     # Image dimensions
-            #     height, width, _ = rgb.shape
-
-            #     # Initialize a zeros mask
-            #     mask = np.zeros((height, width), dtype=np.uint8)
-                
-            #     # Clip the coordinates so they do not exceed image bounds (optional but safer)
-            #     x_min = max(0, x_min)
-            #     y_min = max(0, y_min)
-            #     x_max = min(width,  x_max)
-            #     y_max = min(height, y_max)
-
-            #     # Fill the bounding box region with ones
-            #     mask[y_min:y_max, x_min:x_max] = 1
-            #     return mask
-            # object_mask = bbox_to_mask(rgb, bbox_denorm)
             object_mask = self._mobile_sam.segment_bbox(rgb, bbox_denorm.tolist())
 
             # If we are using vqa, then use the BLIP2 model to visually confirm whether
@@ -481,12 +411,15 @@ class POMDP_REALITY_Policy():
         target_classes = self._target_objects.split("|")
         has_coco = any(c in COCO_CLASSES for c in target_classes) and self._load_yolo
         has_non_coco = any(c not in COCO_CLASSES for c in target_classes)
-
+       
         detections = (
             self._coco_object_detector.predict(img)
         )
         detections.filter_by_class(target_classes)
         det_conf_threshold = self._coco_threshold if has_coco else self._non_coco_threshold
+        if has_coco:
+            print("ALL COCO")
+            print("threshold",det_conf_threshold)
         detections.filter_by_conf(det_conf_threshold)
 
         # if has_coco and has_non_coco and detections.num_detections == 0:

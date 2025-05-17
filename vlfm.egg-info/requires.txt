@@ -1,14 +1,15 @@
-torch>=1.10.1
-numpy>=1.22.4
+torch==1.12.1
+torchvision==0.13.1
+numpy==1.26.4
 flask>=2.3.2
 seaborn>=0.12.2
 open3d>=0.17.0
 transformers==4.26.0
-salesforce-lavis>=1.0.2
+timm==0.4.12
 frontier_exploration@ git+https://github.com/naokiyokoyama/frontier_exploration.git
 mobile_sam@ git+https://github.com/ChaoningZhang/MobileSAM.git
 depth_camera_filtering@ git+https://github.com/naokiyokoyama/depth_camera_filtering
-groundingdino@ git+https://github.com/IDEA-Research/GroundingDINO.git
+opencv-python==4.5.5.64
 
 [dev]
 pre-commit>=3.1.1
